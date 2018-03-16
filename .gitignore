@@ -1,0 +1,11 @@
+[Bb]in/
+[Oo]bj/
+.vs/
+.vscode/
+App_Data/
+*.dll
+*.sqlite
+*.license
+scripts/env.sh
+dist/
+privateKey.xml
