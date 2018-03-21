@@ -2,7 +2,7 @@
 
 A presentation for the [Fox Valley .NET Web Development Meetup](https://www.meetup.com/Fox-Valley-NET-Web-Development-Meetup/).
 
-Also, check out the [accompanying slides](http://slides.com/mattjcowan/foxvalleymeetup-servicestack/live).
+Also, check out the [accompanying slides](http://slides.com/mattjcowan/foxvalleymeetup-servicestack/).
 
 # Create empty aspnet repo
 
