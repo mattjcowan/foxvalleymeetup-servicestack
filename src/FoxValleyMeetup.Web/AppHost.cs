@@ -40,6 +40,137 @@ namespace FoxValleyMeetup.Web
 
         public override void Configure(Container container)
         {
+            JsConfig.DateHandler = DateHandler.ISO8601;
+            
+            container.Register<IDbConnectionFactory>(c => new OrmLiteConnectionFactory(Path.Combine(_dataDir, "db.sqlite"), SqliteDialect.Provider));
+            var dbFactory = TryResolve<IDbConnectionFactory>();
+
+            // var hostConfig = new HostConfig
+            // {
+            //     DebugMode = false, // enables some debugging features
+            //     EnableFeatures = Feature.All.Remove(Feature.Csv), // removes the CSV format
+            //     HandlerFactoryPath = "/api" // moves the ServiceStack api surface under a sub-route
+            // };
+            // hostConfig.GlobalResponseHeaders["X-Powered-By"] = "FoxValley Power";
+            // SetConfig(hostConfig);
+
+            // Routes.Add(typeof(PingRequest), "/pinger", "GET"); 
+
+            Plugins.Add(new PostmanFeature());
+
+            Plugins.Add(new CorsFeature());
+
+            Plugins.Add(new YamlFormat(true));
+
+            var authProviders = new IAuthProvider[] {
+                new CredentialsAuthProvider(),
+                new BasicAuthProvider(),
+                new ApiKeyAuthProvider(),
+                new JwtAuthProvider() {
+                    RequireSecureConnection = false,
+                    HashAlgorithm = "RS256",
+                    PrivateKeyXml = GetPrivateKeyXml()
+                },
+                new DigestAuthProvider(this.AppSettings),
+                new FacebookAuthProvider(this.AppSettings),
+                new TwitterAuthProvider(this.AppSettings),
+                new GithubAuthProvider(this.AppSettings)
+            };
+
+            Plugins.Add(new AuthFeature(() => new AuthUserSession(), authProviders) {
+                SaveUserNamesInLowerCase = true,
+            });
+
+            Plugins.Add(new RegistrationFeature() {
+                AtRestPath = "/register"
+            });
+
+            // CACHING
+            // container.Register<IRedisClientsManager>(c => new RedisManagerPool("localhost:6379"));            
+            if (container.TryResolve<IRedisClientsManager>() != null) // caching redis
+                container.Register(c => c.Resolve<IRedisClientsManager>().GetCacheClient());
+            else if (dbFactory != null) // caching database
+                container.Register<ICacheClient>(new OrmLiteCacheClient() { DbFactory = dbFactory });
+            else // caching in-memory
+                container.Register<ICacheClient>(new MemoryCacheClient());
+            (TryResolve<ICacheClient>() as IRequiresSchema)?.InitSchema();
+
+            // AUTHENTICATION
+            IAuthRepository authRepository;
+            if (dbFactory != null)
+                authRepository = new OrmLiteAuthRepository(dbFactory);
+            else 
+                authRepository = new InMemoryAuthRepository();                
+            Register<IAuthRepository>(authRepository);
+            (TryResolve<IAuthRepository>() as IRequiresSchema)?.InitSchema();
+
+            var authRepo = TryResolve<IAuthRepository>();
+            if (authRepo != null)
+            {
+                var adminUser = authRepo.GetUserAuthByUserName("admin");
+                if (adminUser == null)
+                {
+                    adminUser = authRepo.CreateUserAuth(
+                        new UserAuth { UserName = "admin", DisplayName = "Administrator", Email = "admin@company.com" }, "admin");
+                }
+                var roles = authRepo.GetRoles(adminUser);
+                if (!roles.Contains("Admin"))
+                {
+                    authRepo.AssignRoles(adminUser, new [] { "Admin" });
+                }
+
+                var guestUser = authRepo.GetUserAuthByUserName("guest");
+                if (guestUser == null)
+                {
+                    guestUser = authRepo.CreateUserAuth(
+                        new UserAuth { UserName = "guest", DisplayName = "Guest", Email = "guest@company.com" }, "guest");
+                }
+            }
+            
+            if (dbFactory != null)
+            {
+                using(var db = dbFactory.OpenDbConnection())
+                {
+                    db.CreateTableIfNotExists(typeof(Bookmark));
+
+                    var bkFile = Path.Combine(_dataDir, "bookmarks.csv");
+                    var bkFileOld = bkFile + ".old";
+                    
+                    if (File.Exists(bkFileOld)) 
+                    {
+                        File.Delete(bkFile);
+                    }
+
+                    if (File.Exists(bkFile))
+                    {
+                        using (var stream = File.OpenRead(bkFile))
+                        {
+                            var bookmarks = BookmarkUtils.ToBookmarks(stream);
+                            foreach(var bookmark in bookmarks)
+                            {
+                                bookmark.CreatedBy = "admin";
+                                bookmark.CreatedById = 1;
+                                bookmark.CreatedOn = DateTime.UtcNow;
+                                bookmark.ModifiedBy = "admin";
+                                bookmark.ModifiedById = 1;
+                                bookmark.ModifiedOn = DateTime.UtcNow;
+                                try
+                                {
+                                    db.Insert(bookmark);
+                                }
+                                catch {}
+                            }
+                        }
+                        File.Move(bkFile, bkFile + ".old");
+                    }
+                }
+                var autoQuery = new AutoQueryFeature { MaxLimit = 100 };
+                Plugins.Add(autoQuery);
+            }
+
+            Plugins.Add(new OpenApiFeature() {
+                UseCamelCaseSchemaPropertyNames = true
+            });
         }
         public void ConfigureFake(Container container)
         {

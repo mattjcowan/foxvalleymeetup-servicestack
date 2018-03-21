@@ -24,6 +24,8 @@ namespace FoxValleyMeetup
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
+            Licensing.RegisterLicense(@"5932-e1JlZjo1OTMyLE5hbWU6TUpDWm9uZSBJbmMuLFR5cGU6SW5kaWUsSGFzaDpXVFg4dWRIbXpzK0FBRHZCMy9UN1RIUktBR09JSkRqWjhrL0RrM1hwM3p1MFpROUI4clZYc3A4SzBHQnNjRWQzYk1GMjE4clo3UGV2aDNEME1TZzNTM2I0Y0hraEZjMWpjUVFmYWJCNk9ZTWhLOWE4Y2FiL0E0L3BSM3d3OWJEWllqR2J2Wm96NVR0ajJJeXY4eGw1VTRlMExESVBLQnRxUUUyWVdYek5qb0E9LEV4cGlyeToyMDE5LTAzLTE0fQ==");
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();

@@ -3,6 +3,7 @@
 .vs/
 .vscode/
 App_Data/
+App_Plugins/
 *.dll
 *.sqlite
 *.license
